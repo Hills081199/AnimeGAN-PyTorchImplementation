@@ -1,7 +1,14 @@
 import os
+import torch
 import numpy as np
 import cv2
 from tqdm import tqdm
+
+rgb_to_yuv_kernel = torch.tensor([
+    [0.299, -0.14714119, 0.61497538],
+    [0.587, -0.28886916, -0.51496512],
+    [0.114, 0.43601035, -0.10001026]
+]).float
 
 def normalize_input(images):
     '''
@@ -27,3 +34,26 @@ def compute_data_mean(data_folder):
     mean = np.mean(channel_mean)
 
     return mean - channel_mean[...,::-1]  # Convert to BGR for training
+
+def rgb_to_yuv(img):
+    img = (img+1.0)/2.0
+    if torch.cuda.is_available():
+        rgb_to_yuv_kernel = rgb_to_yuv_kernel.cuda()
+    yuv = torch.tensordot(img, rgb_to_yuv_kernel, dims=([img.ndim-3],[0]))
+    return yuv
+
+def gram_matrix(input):
+    """
+    https://pytorch.org/tutorials/advanced/neural_style_tutorial.html#style-loss
+    """
+
+    batch_size, channels, width, height = input.size()
+    features = input.view(batch_size * channels, width * height)
+
+    #Gram product
+    G = torch.mm(features, features.t())
+
+    # we 'normalize' the values of the gram matrix
+    # by dividing by the number of element in each feature maps.
+    return G.div(batch_size*channels*width*height)
+
