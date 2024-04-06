@@ -28,7 +28,7 @@ class AnimeDataset(Dataset):
     def __getitem__(self, idx):
         img = self.load_train_img(idx)
         anime_idx = idx
-        if anime_idx > self.num_anime_imgs:
+        if anime_idx > self.num_anime_imgs - 1:
             anime_idx -= self.num_anime_imgs * (idx//self.num_anime_imgs)
         
         anime_style, anime_style_gray = self.load_anime(anime_idx)

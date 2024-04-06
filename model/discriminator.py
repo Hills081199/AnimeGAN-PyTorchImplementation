@@ -2,7 +2,7 @@ import torch.nn as nn
 from torch.nn.utils import spectral_norm
 
 class Discriminator(nn.Module):
-    def __init__(self, num_middle_layers=2):
+    def __init__(self, num_middle_layers=3):
         super(Discriminator, self).__init__()
         channels = 32
         self.start_layers = nn.Sequential(

@@ -6,9 +6,10 @@ from torch.utils.data import DataLoader
 from model.generator import Generator
 from model.discriminator import Discriminator
 from dataset import AnimeDataset
-from utils import set_lr, save_model, gaussian_noise
+from utils import set_lr, save_model, load_model, gaussian_noise, save_samples
 from loss import AnimeLoss
 from tqdm import tqdm
+import time
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -25,28 +26,45 @@ if __name__ == '__main__':
     G = Generator().to(device)
     D = Discriminator().to(device)
 
-    if train_config.starting_training_epoch != 0:
-        assert train_config.starting_training_epoch < train_config.total_epochs and train_config.starting_training_epoch >= 0, "starting training epoch should be less than total epochs and greater than 0"
+    if train_config.starting_training_epoch <= train_config.init_g_starting_epoch:
+        train_config.starting_training_epoch = 0
+    
+    else:
+        g_model_name = f'G_{train_config.anime_dataset}_at_epoch_{train_config.starting_training_epoch+1}'
+        d_model_name = f''f'D_{train_config.anime_dataset}_at_epoch_{train_config.starting_training_epoch+1}'
+        g_checkpoint_existed_path = os.path.join(train_config.model_dir, f'{g_model_name}.pth')
+        d_checkpoint_existed_path = os.path.join(train_config.model_dir, f'{d_model_name}.pth')
+        if not os.path.exists(g_checkpoint_existed_path) or not os.path.exists(d_checkpoint_existed_path):
+            raise FileNotFoundError(f'Not found existed model G / D at epoch : {train_config.starting_training_epoch+1}')
+        
+        print("LOAD existed G ...")
+        load_model(g_model_name, train_config.model_dir, G)
+
+        print("LOAD existed D ...")
+        load_model(d_model_name, train_config.model_dir, D)
         
         #load existed model state dict to continue training
 
     #optimizer
-    optimizer_g = torch.optim.Adam(G.parameters(), train_config.learning_rate, betas=(0.5, 0.999))
-    optimizer_d = torch.optim.Adam(D.parameters(), train_config.learning_rate, betas=(0.5, 0.999))
+    optimizer_g = torch.optim.Adam(G.parameters(), train_config.learning_rate_g, betas=(0.5, 0.999))
+    optimizer_d = torch.optim.Adam(D.parameters(), train_config.learning_rate_d, betas=(0.5, 0.999))
 
     #loss
     anime_loss = AnimeLoss(device, train_config.wadvg, train_config.wadvd, train_config.wcon, train_config.wgra, train_config.wcol)
 
     if not os.path.isdir(train_config.model_dir):
         os.makedirs(train_config.model_dir)
+
+    if not os.path.isdir(train_config.save_img_dir):
+        os.makedirs(train_config.save_img_dir)
     
     print("Start training from epoch : ", train_config.starting_training_epoch)
     for epoch in range(train_config.starting_training_epoch, train_config.total_epochs):
         init_content_loss_epoch = []
-        content_loss_epoch = []
-        gram_loss_epoch = []
-        color_loss_epoch = []
-        adversarial_g_loss_epoch = []
+        # content_loss_epoch = []
+        # gram_loss_epoch = []
+        # color_loss_epoch = []
+        # adversarial_g_loss_epoch = []
         g_loss_epoch = []
         d_loss_epoch = []
 
@@ -68,8 +86,7 @@ if __name__ == '__main__':
                 optimizer_g.step()
                 
                 init_content_loss_epoch.append(content_loss.cpu().detach().numpy())
-                break
-
+                
             init_content_loss = sum(init_content_loss_epoch) / len(init_content_loss_epoch)
             print("Epoch : {}/{}, content_loss_init : {}".format(epoch+1, train_config.total_epochs, init_content_loss))
 
@@ -110,20 +127,21 @@ if __name__ == '__main__':
             g_loss.backward()
             optimizer_g.step()
 
-            adversarial_g_loss_epoch.append(adversarial_g_loss_epoch)
-            content_loss_epoch.append(content_loss)
-            gram_loss_epoch.append(gram_loss)
-            color_loss_epoch.append(color_loss_epoch)
-            g_loss_epoch.append(g_loss)
-            break
+            # adversarial_g_loss_epoch.append(adversarial_g_loss_epoch)
+            # content_loss_epoch.append(content_loss)
+            # gram_loss_epoch.append(gram_loss)
+            # color_loss_epoch.append(color_loss_epoch)
+            # g_loss_epoch.append(g_loss)
+            
             
         
         if (epoch+1) % train_config.save_epoch == 0:
-            save_model(model_name="G_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
-            save_model(model_name="D_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=D, optimizer=optimizer_d, epoch=epoch+1)
-        
+            save_model(model_name="G_{}_at_epoch_{}".format(train_config.anime_dataset, epoch+1), model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
+            save_model(model_name="D_{}_at_epoch_{}".format(train_config.anime_dataset, epoch+1), model_dir=train_config.model_dir, model=D, optimizer=optimizer_d, epoch=epoch+1)
+            save_samples(train_config.save_img_dir, G, data_loader, train_config.batch_size, subname=train_config.anime_dataset+"_style")
+            
         _d_loss = sum(d_loss_epoch)/len(d_loss_epoch)
         _g_loss = sum(g_loss_epoch)/len(g_loss_epoch)
         print("Epoch : {}/{}, D_LOSS : {}, G_LOSS: {}".format(epoch+1, train_config.total_epochs, _d_loss, _g_loss))
         
-        break
+        
