@@ -57,3 +57,15 @@ def gram_matrix(input):
     # by dividing by the number of element in each feature maps.
     return G.div(batch_size*channels*width*height)
 
+def set_lr(optimizer, lr):
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+def save_model(model_name, model_dir, model, optimizer, epoch):
+    checkpoint = {
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'epoch': epoch
+    } 
+    save_path = os.path.join(model_dir, f'{model_name}.pth')
+    torch.save(checkpoint, save_path)

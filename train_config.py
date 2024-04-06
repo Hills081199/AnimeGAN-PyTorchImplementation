@@ -1,0 +1,15 @@
+data_dir = "D:\Datasets\\animegan_dataset"
+anime_dir = "D:\Datasets\\animegan_dataset\Hayao"
+anime_dataset = "Hayao"
+model_dir = ""
+batch_size = 4
+learning_rate = 0
+init_learning_rate_g = 0.0001
+total_epochs = 100
+starting_training_epoch = 0
+init_g_starting_epoch = 5
+wadvg = 10.0
+wadvd = 10.0
+wcon = 1.5
+wgra = 3.0
+wcol = 30.0
