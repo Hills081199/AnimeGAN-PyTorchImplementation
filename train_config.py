@@ -8,6 +8,7 @@ init_learning_rate_g = 0.0001
 total_epochs = 100
 starting_training_epoch = 0
 init_g_starting_epoch = 5
+save_epoch = 5
 wadvg = 10.0
 wadvd = 10.0
 wcon = 1.5

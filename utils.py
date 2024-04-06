@@ -57,6 +57,9 @@ def gram_matrix(input):
     # by dividing by the number of element in each feature maps.
     return G.div(batch_size*channels*width*height)
 
+def gaussian_noise():
+    return torch.normal(torch.tensor(0.0), torch.tensor(0.1))
+
 def set_lr(optimizer, lr):
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr

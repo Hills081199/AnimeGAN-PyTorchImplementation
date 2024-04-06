@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from model.generator import Generator
 from model.discriminator import Discriminator
 from dataset import AnimeDataset
-from utils import set_lr, save_model
+from utils import set_lr, save_model, gaussian_noise
 from loss import AnimeLoss
 
 if __name__ == '__main__':
@@ -36,6 +36,7 @@ if __name__ == '__main__':
 
     print("Start training from epoch : ", train_config.starting_training_epoch)
     for epoch in range(train_config.starting_training_epoch, train_config.total_epochs):
+        init_content_loss_epoch = []
         content_loss_epoch = []
         gram_loss_epoch = []
         color_loss_epoch = []
@@ -59,17 +60,58 @@ if __name__ == '__main__':
                 content_loss.backward()
                 optimizer_g.step()
                 
-                content_loss_epoch.append(content_loss.cpu().detach().numpy())
+                init_content_loss_epoch.append(content_loss.cpu().detach().numpy())
             
-            init_content_loss = sum(content_loss_epoch) / len(content_loss_epoch)
-            print("Epoch : {}/{}, content_loss : {}".format(epoch+1, train_config.total_epochs, init_content_loss))
+            init_content_loss = sum(init_content_loss_epoch) / len(init_content_loss_epoch)
+            print("Epoch : {}/{}, content_loss_init : {}".format(epoch+1, train_config.total_epochs, init_content_loss))
 
             #save init model
             save_model(model_name="G_init", model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
             continue
 
-        # for img, anime_style, anime_style_gray, anime_smooth in data_loader:
-        #     img = img.to(device)
-        #     anime_style = anime_style.to(device)
-        #     anime_style_gray = anime_style_gray.to(device)
-        #     anime_smooth = anime_smooth.to(device)
+        for img, anime_style, anime_style_gray, anime_smooth in data_loader:
+            img = img.to(device)
+            anime_style = anime_style.to(device)
+            anime_style_gray = anime_style_gray.to(device)
+            anime_smooth = anime_smooth.to(device)
+
+            #train G
+            optimizer_g.zero_grad()
+            fake_img = G(img).detach()
+            fake_logit = D(fake_img).detach()
+            adversarial_g_loss, content_loss, gram_loss, color_loss = anime_loss.g_loss(img, fake_img, fake_logit, anime_style_gray)
+            g_loss = adversarial_g_loss + content_loss + gram_loss + color_loss
+            g_loss.backward()
+            optimizer_g.step()
+
+            adversarial_g_loss_epoch.append(adversarial_g_loss_epoch)
+            content_loss_epoch.append(content_loss)
+            gram_loss_epoch.append(gram_loss)
+            color_loss_epoch.append(color_loss_epoch)
+
+            #train D
+            optimizer_d.zero_grad()
+            fake_img = G(img)
+            fake_img += gaussian_noise()
+            anime_style += gaussian_noise()
+            anime_style_gray += gaussian_noise()
+            anime_smooth += gaussian_noise()
+
+            fake_logit = D(fake_img)
+            real_anime_logit = D(anime_style)
+            real_anime_gray_logit = D(anime_style_gray)
+            real_anime_smooth_gray_logit = D(anime_smooth)
+            d_loss = anime_loss.d_loss(real_anime_logit, fake_logit, real_anime_gray_logit, real_anime_smooth_gray_logit)
+            d_loss.backward()
+            optimizer_d.step()
+
+            d_loss_epoch.append(d_loss)
+        
+        if (epoch+1) % train_config.save_epoch == 0:
+            save_model(model_name="G_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
+            save_model(model_name="D_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=D, optimizer=optimizer_d, epoch=epoch+1)
+        
+        _d_loss = sum(d_loss_epoch)/len(d_loss_epoch)
+        _g_loss = sum(g_loss_epoch)/len(g_loss_epoch)
+        print("Epoch : {}/{}, D_LOSS : {}, G_LOSS: {}".format(epoch+1, train_config.total_epochs, _d_loss, _g_loss))
+        
