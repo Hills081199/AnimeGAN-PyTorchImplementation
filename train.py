@@ -1,5 +1,5 @@
 import train_config
-import argparse
+import os
 import torch
 
 from torch.utils.data import DataLoader
@@ -8,6 +8,9 @@ from model.discriminator import Discriminator
 from dataset import AnimeDataset
 from utils import set_lr, save_model, gaussian_noise
 from loss import AnimeLoss
+from tqdm import tqdm
+
+torch.autograd.set_detect_anomaly(True)
 
 if __name__ == '__main__':
     #Get device
@@ -34,6 +37,9 @@ if __name__ == '__main__':
     #loss
     anime_loss = AnimeLoss(device, train_config.wadvg, train_config.wadvd, train_config.wcon, train_config.wgra, train_config.wcol)
 
+    if not os.path.isdir(train_config.model_dir):
+        os.makedirs(train_config.model_dir)
+    
     print("Start training from epoch : ", train_config.starting_training_epoch)
     for epoch in range(train_config.starting_training_epoch, train_config.total_epochs):
         init_content_loss_epoch = []
@@ -50,9 +56,10 @@ if __name__ == '__main__':
         content loss Lcon(G, D). The initialization training is performed for one epoch
         and the learning rate is set to 0.0001.
         """
-        if epoch < train_config.starting_training_epoch:
+        if epoch < train_config.init_g_starting_epoch:
+            print("INIT SESSION....")
             set_lr(optimizer_g, train_config.init_learning_rate_g)
-            for img, *_ in data_loader:
+            for img, *_ in tqdm(data_loader):
                 img = img.to(device)
                 optimizer_g.zero_grad()
                 fake_img = G(img)
@@ -61,37 +68,24 @@ if __name__ == '__main__':
                 optimizer_g.step()
                 
                 init_content_loss_epoch.append(content_loss.cpu().detach().numpy())
-            
+                break
+
             init_content_loss = sum(init_content_loss_epoch) / len(init_content_loss_epoch)
             print("Epoch : {}/{}, content_loss_init : {}".format(epoch+1, train_config.total_epochs, init_content_loss))
 
             #save init model
-            save_model(model_name="G_init", model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
+            save_model(model_name="G_init_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
             continue
-
+            
         for img, anime_style, anime_style_gray, anime_smooth in data_loader:
             img = img.to(device)
             anime_style = anime_style.to(device)
             anime_style_gray = anime_style_gray.to(device)
             anime_smooth = anime_smooth.to(device)
 
-            #train G
-            optimizer_g.zero_grad()
-            fake_img = G(img).detach()
-            fake_logit = D(fake_img).detach()
-            adversarial_g_loss, content_loss, gram_loss, color_loss = anime_loss.g_loss(img, fake_img, fake_logit, anime_style_gray)
-            g_loss = adversarial_g_loss + content_loss + gram_loss + color_loss
-            g_loss.backward()
-            optimizer_g.step()
-
-            adversarial_g_loss_epoch.append(adversarial_g_loss_epoch)
-            content_loss_epoch.append(content_loss)
-            gram_loss_epoch.append(gram_loss)
-            color_loss_epoch.append(color_loss_epoch)
-
             #train D
             optimizer_d.zero_grad()
-            fake_img = G(img)
+            fake_img = G(img).detach()
             fake_img += gaussian_noise()
             anime_style += gaussian_noise()
             anime_style_gray += gaussian_noise()
@@ -106,6 +100,23 @@ if __name__ == '__main__':
             optimizer_d.step()
 
             d_loss_epoch.append(d_loss)
+
+            #train G
+            optimizer_g.zero_grad()
+            fake_img = G(img)
+            fake_logit = D(fake_img)
+            adversarial_g_loss, content_loss, gram_loss, color_loss = anime_loss.g_loss(img, fake_img, fake_logit, anime_style_gray)
+            g_loss = adversarial_g_loss + content_loss + gram_loss + color_loss
+            g_loss.backward()
+            optimizer_g.step()
+
+            adversarial_g_loss_epoch.append(adversarial_g_loss_epoch)
+            content_loss_epoch.append(content_loss)
+            gram_loss_epoch.append(gram_loss)
+            color_loss_epoch.append(color_loss_epoch)
+            g_loss_epoch.append(g_loss)
+            break
+            
         
         if (epoch+1) % train_config.save_epoch == 0:
             save_model(model_name="G_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
@@ -115,3 +126,4 @@ if __name__ == '__main__':
         _g_loss = sum(g_loss_epoch)/len(g_loss_epoch)
         print("Epoch : {}/{}, D_LOSS : {}, G_LOSS: {}".format(epoch+1, train_config.total_epochs, _d_loss, _g_loss))
         
+        break

@@ -1,7 +1,7 @@
 data_dir = "D:\Datasets\\animegan_dataset"
 anime_dir = "D:\Datasets\\animegan_dataset\Hayao"
 anime_dataset = "Hayao"
-model_dir = ""
+model_dir = "./checkpoints/"
 batch_size = 4
 learning_rate = 0
 init_learning_rate_g = 0.0001

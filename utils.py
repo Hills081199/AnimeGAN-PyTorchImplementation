@@ -8,7 +8,10 @@ rgb_to_yuv_kernel = torch.tensor([
     [0.299, -0.14714119, 0.61497538],
     [0.587, -0.28886916, -0.51496512],
     [0.114, 0.43601035, -0.10001026]
-]).float
+]).float()
+
+if torch.cuda.is_available():
+    rgb_to_yuv_kernel = rgb_to_yuv_kernel.cuda()
 
 def normalize_input(images):
     '''
@@ -37,8 +40,6 @@ def compute_data_mean(data_folder):
 
 def rgb_to_yuv(img):
     img = (img+1.0)/2.0
-    if torch.cuda.is_available():
-        rgb_to_yuv_kernel = rgb_to_yuv_kernel.cuda()
     yuv = torch.tensordot(img, rgb_to_yuv_kernel, dims=([img.ndim-3],[0]))
     return yuv
 

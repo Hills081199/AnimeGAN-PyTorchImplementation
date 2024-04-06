@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 from model.components import *
 
 class Generator(nn.Module):
@@ -34,13 +35,12 @@ class Generator(nn.Module):
             ConvBlock(in_channels=64, out_channels=64),
             ConvBlock(in_channels=64, out_channels=64),
             nn.Conv2d(64, 3, kernel_size=1, stride=1, padding=0, bias=False),
-            nn.Tanh()
         )
     
     def forward(self, x):
         x = self.encoder(x)
         x = self.ir_blocks(x)
-        x = self.decoder(x)
+        x = torch.nn.functional.tanh(self.decoder(x))
         return x
     
 # if __name__ == '__main__':

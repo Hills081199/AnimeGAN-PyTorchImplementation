@@ -46,7 +46,7 @@ class AnimeLoss:
         img_feat = self.vgg_19(img)
         img_g_feat = self.vgg_19(img_g)
         anime_gray_feat = self.vgg_19(anime_gray)
-        return self.w_adv_g * self.l_adv_g(fake_logit) + self.w_con * self.l_con(img_feat, img_g_feat) + self.w_gra * self.l_gra(img_g_feat, anime_gray_feat) + self.w_col * self.color_loss(img, img_g)
+        return self.w_adv_g * self.l_adv_g(fake_logit) , self.w_con * self.l_con(img_feat, img_g_feat) , self.w_gra * self.l_gra(img_g_feat, anime_gray_feat) , self.w_col * self.color_loss(img, img_g)
 
     def d_loss(self, real_anime_logit, fake_logit, real_anime_gray_logit, real_anime_smooth_gray_logit):
         """
@@ -114,3 +114,9 @@ class AnimeLoss:
             fake_logit : output of D given by img_g ( img_g = G(img) ) , anime_gray and anime_smooth_gray
         """
         return torch.mean(torch.square(fake_logit-0.0))
+
+    def l_con_init(self, img, fake_img):
+        img_feat = self.vgg_19(img)
+        fake_img_feat = self.vgg_19(fake_img)
+
+        return self.content_loss(img_feat, fake_img_feat)
