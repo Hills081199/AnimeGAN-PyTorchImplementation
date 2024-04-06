@@ -94,7 +94,7 @@ if __name__ == '__main__':
             save_model(model_name="G_init_at_epoch_{}".format(epoch+1), model_dir=train_config.model_dir, model=G, optimizer=optimizer_g, epoch=epoch+1)
             continue
             
-        for img, anime_style, anime_style_gray, anime_smooth in data_loader:
+        for img, anime_style, anime_style_gray, anime_smooth in tqdm(data_loader):
             img = img.to(device)
             anime_style = anime_style.to(device)
             anime_style_gray = anime_style_gray.to(device)
@@ -131,7 +131,7 @@ if __name__ == '__main__':
             # content_loss_epoch.append(content_loss)
             # gram_loss_epoch.append(gram_loss)
             # color_loss_epoch.append(color_loss_epoch)
-            # g_loss_epoch.append(g_loss)
+            g_loss_epoch.append(g_loss)
             
             
         
